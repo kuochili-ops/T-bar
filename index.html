@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>國道 T-bar 模擬寫實美景版 V16</title>
+    <style>
+        body { margin: 0; background: #b3e0f2; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; height: 100vh; }
+        .container { display: flex; flex-direction: column; align-items: center; background: #f1f5f9; padding: 10px; width: 100vw; max-width: 1024px; box-sizing: border-box; height: 100vh; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        
+        canvas { background: #b3e0f2; border-radius: 8px; border: 2px solid #94a3b8; width: 100%; height: auto; aspect-ratio: 16/10; flex-shrink: 0; }
+        
+        body.viewer-mode { background: #b3e0f2; }
+        body.viewer-mode .container { height: 100vh; width: 100vw; max-width: none; padding: 0; justify-content: center; background: #b3e0f2; }
+        body.viewer-mode canvas { border-radius: 0; border: none; width: 100vw; height: 100vh; aspect-ratio: auto; }
+        body.viewer-mode .control-panel { display: none !important; }
+
+        .control-panel { width: 100%; flex: 1; margin-top: 10px; background: #f8fafc; padding: 15px; border-radius: 12px; color: #1e293b; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; border: 2px solid #e2e8f0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        
+        .global-settings { background: #ffffff; padding: 12px; border-radius: 10px; border: 2px solid #cbd5e1; display: flex; flex-direction: column; gap: 10px; }
+        .setting-title { font-weight: bold; font-size: 15px; color: #334155; }
+        
+        .color-row { display: flex; gap: 20px; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; }
+        .color-item { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: bold; color: #475569; }
+        .color-item input conversion[type="color"] { border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; background: none; }
+        .color-item input { border: none; width: 32px; height: 32px; cursor: pointer; }
+
+        .inputs-container { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .input-card { background: #ffffff; padding: 12px; border-radius: 10px; border: 2px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px; }
+        
+        textarea { width: 100%; height: 65px; padding: 10px; border-radius: 6px; border: 2px solid #cbd5e1; background: #f8fafc; color: #1e293b; font-size: 17px; font-weight: bold; box-sizing: border-box; resize: none; line-height: 1.4; }
+        
+        .add-btn { background: #10b981; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+        .checkbox-group { display: flex; gap: 15px; margin-top: 5px; flex-wrap: wrap; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #334155; font-weight: bold; cursor: pointer; }
+        .checkbox-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #10b981; }
+
+        .share-banner { background: #e0f2fe; border: 2px solid #7dd3fc; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .share-btns { display: flex; gap: 10px; }
+        .share-action-btn { flex: 1; padding: 10px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; text-align: center; }
+        
+        .bottom-row { display: flex; flex-direction: column; gap: 10px; border-top: 2px solid #e2e8f0; padding-top: 12px; flex-shrink: 0; }
+        .slider-group { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 15px; }
+        
+        input[type="range"] { flex: 1; height: 10px; accent-color: #10b981; }
+        .speed-badge { background: #10b981; padding: 4px 12px; border-radius: 6px; font-weight: bold; color: white; }
+        .rec-badge { background: #ef4444; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; animation: blink 1s infinite; display: none; margin-left: auto;}
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <canvas id="highwayCanvas" width="1024" height="640"></canvas>
+
+    <div class="control-panel" id="scrollPanel">
+        <div class="global-settings">
+            <div class="setting-title">🎨 全域看板顏色設定</div>
+            <div class="color-row">
+                <div class="color-item">底色：<input type="color" id="globalBgColor" value="#064e3b" onchange="syncGlobalSettings()"></div>
+                <div class="color-item">字色：<input type="color" id="globalFgColor" value="#ffffff" onchange="syncGlobalSettings()"></div>
+            </div>
+        </div>
+
+        <div class="inputs-container" id="cardsHolder"></div>
+        <button class="add-btn" onclick="addNewTBarNode('')">➕ 新增下一支 T-bar 看板</button>
+        
+        <div class="global-settings">
+            <div class="setting-title">🏁 結尾看板追加項目</div>
+            <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" id="addDateCheck" onchange="syncGlobalSettings()"> 追加「日期星期」看板</label>
+                <label class="checkbox-item"><input type="checkbox" id="addTimeCheck" onchange="syncGlobalSettings()"> 追加「即時時間」看板</label>
+            </div>
+        </div>
+
+        <div class="share-banner" id="shareBanner">
+            <div class="setting-title" style="color:#0369a1; display:flex; align-items:center;">🔗 網址分享與自動錄影存檔 <span class="rec-badge" id="recBadge">🔴 自動錄影中...</span></div>
+            <div class="share-btns">
+                <button class="share-action-btn" style="background:#0284c7; color:white;" onclick="generateShareUrl(false)">複製分享網址</button>
+                <button class="share-action-btn" style="background:#0f172a; color:white;" onclick="generateShareUrl(true)">進入純觀賞模式</button>
+            </div>
+        </div>
+
+        <div class="bottom-row">
+            <div class="slider-group">
+                <label style="font-weight:bold; color:#475569;">行駛車速：</label>
+                <input type="range" id="speedSlider" min="1" max="25" value="5">
+                <span class="speed-badge" id="speedVal">5</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('highwayCanvas');
+const ctx = canvas.getContext('2d');
+
+// 🛠️ 幾何修正：地平線拉高，消失點靠左（模擬人坐在右側車道的視野）
+let HorizonY = canvas.height * 0.50; 
+let VanishingX = canvas.width * 0.42; 
+const d = 260; 
+
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+let currentSpeed = parseInt(speedSlider.value);
+speedSlider.oninput = function() {
+    currentSpeed = parseInt(this.value);
+    speedVal.innerText = this.currentSpeed;
+    saveToHash();
+}
+
+let roadOffset = 0;
+const spacing = 1500; 
+let tBarsData = []; 
+let textNodeInputs = []; 
+
+let mediaRecorder;
+let recordedChunks = [];
+let isRecording = false;
+let firstBarLapCounter = 0; 
+
+// ☁️ 動態隨機白雲資料庫組
+let clouds = [
+    {x: 100, y: 60, r: 40, speed: 0.1},
+    {x: 250, y: 90, r: 55, speed: 0.15},
+    {x: 550, y: 50, r: 35, speed: 0.08},
+    {x: 800, y: 110, r: 60, speed: 0.12},
+    {x: 950, y: 70, r: 45, speed: 0.09}
+];
+
+function init() {
+    if (window.location.hash) {
+        try {
+            const rawData = decodeURIComponent(window.location.hash.substring(1));
+            const params = JSON.parse(rawData);
+            
+            document.getElementById('globalBgColor').value = params.bg || '#064e3b';
+            document.getElementById('globalFgColor').value = params.fg || '#ffffff';
+            document.getElementById('addDateCheck').checked = !!params.date;
+            document.getElementById('addTimeCheck').checked = !!params.time;
+            if(params.spd) { speedSlider.value = params.spd; speedVal.innerText = params.spd; currentSpeed = params.spd; }
+            
+            if (params.texts && params.texts.length > 0) {
+                params.texts.forEach(t => addNewTBarNode(t));
+            } else {
+                addNewTBarNode("富貴在前方\n請即刻出發");
+            }
+            
+            if (params.view) {
+                document.body.classList.add('viewer-mode');
+                resizeCanvasForViewer();
+                window.addEventListener('resize', resizeCanvasForViewer);
+                setTimeout(startAutoRecording, 1000);
+            }
+        } catch(e) {
+            loadDefault();
+        }
+    } else {
+        loadDefault();
+    }
+    rebuild3DBars();
+}
+
+function loadDefault() {
+    addNewTBarNode("富貴在前方\n請即刻出發");
+}
+
+function resizeCanvasForViewer() {
+    if(document.body.classList.contains('viewer-mode')) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        HorizonY = canvas.height * 0.50;
+        VanishingX = canvas.width * 0.42;
+    }
+}
+
+function addNewTBarNode(initialText = "") {
+    const holder = document.getElementById('cardsHolder');
+    const idx = textNodeInputs.length;
+    
+    const newCard = document.createElement('div');
+    newCard.className = 'input-card';
+    newCard.id = `card${idx}`;
+    newCard.innerHTML = `
+        <label style="font-weight:bold;color:#475569;">T-bar ${idx + 1} 訊息內容</label>
+        <textarea id="text${idx}" oninput="onTextChange(${idx})">${initialText}</textarea>
+    `;
+    holder.appendChild(newCard);
+    textNodeInputs.push(initialText);
+    
+    if(initialText === "") {
+        document.getElementById(`text${idx}`).placeholder = "請輸入訊息 (Enter鍵換行)...";
+    }
+    
+    rebuild3DBars();
+    saveToHash();
+}
+
+function onTextChange(idx) {
+    textNodeInputs[idx] = document.getElementById(`text${idx}`).value;
+    rebuild3DBars();
+    saveToHash();
+}
+
+function syncGlobalSettings() {
+    rebuild3DBars();
+    saveToHash();
+}
+
+function rebuild3DBars() {
+    const bgColor = document.getElementById('globalBgColor').value;
+    const fgColor = document.getElementById('globalFgColor').value;
+    const addDate = document.getElementById('addDateCheck').checked;
+    const addTime = document.getElementById('addTimeCheck').checked;
+
+    const oldZMap = {};
+    tBarsData.forEach(b => { oldZMap[b.uniqueId] = b.z3d; });
+
+    tBarsData = [];
+    let currentZ = 1300;
+
+    textNodeInputs.forEach((txt, index) => {
+        const uid = `text_${index}`;
+        tBarsData.push({
+            uniqueId: uid,
+            // 🛠️ 因為視角偏右，將 T-bar 看板物理位置往右平移，確保柱子立在右邊草地
+            x3d: 550, y3d: -580,
+            z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
+            width: 780, height: 320,
+            type: 'text', textIndex: index,
+            bgColor: bgColor, fgColor: fgColor
+        });
+        currentZ += spacing;
+    });
+
+    if (addDate) {
+        const uid = 'appendix_date';
+        tBarsData.push({
+            uniqueId: uid, x3d: 550, y3d: -580,
+            z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
+            width: 780, height: 320, type: 'date', bgColor: bgColor, fgColor: fgColor
+        });
+        currentZ += spacing;
+    }
+
+    if (addTime) {
+        const uid = 'appendix_time';
+        tBarsData.push({
+            uniqueId: uid, x3d: 550, y3d: -580,
+            z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
+            width: 780, height: 320, type: 'time', bgColor: bgColor, fgColor: fgColor
+        });
+    }
+}
+
+function saveToHash() {
+    if(document.body.classList.contains('viewer-mode')) return;
+    const params = {
+        bg: document.getElementById('globalBgColor').value,
+        fg: document.getElementById('globalFgColor').value,
+        date: document.getElementById('addDateCheck').checked ? 1 : 0,
+        time: document.getElementById('addTimeCheck').checked ? 1 : 0,
+        spd: currentSpeed,
+        texts: textNodeInputs
+    };
+    window.location.hash = encodeURIComponent(JSON.stringify(params));
+}
+
+function generateShareUrl(isViewer = false) {
+    saveToHash();
+    if (isViewer) {
+        const rawHash = decodeURIComponent(window.location.hash.substring(1));
+        const params = JSON.parse(rawHash);
+        params.view = 1;
+        const newHash = encodeURIComponent(JSON.stringify(params));
+        window.open(window.location.origin + window.location.pathname + '#' + newHash, '_blank');
+    } else {
+        navigator.clipboard.writeText(window.location.href);
+        alert('🔗 分享網址已複製到剪貼簿！');
+    }
+}
+
+function startAutoRecording() {
+    if (isRecording) return;
+    recordedChunks = [];
+    firstBarLapCounter = 0;
+    
+    const stream = canvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6000000 });
+    
+    mediaRecorder.ondataavailable = function(e) {
+        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    };
+    
+    mediaRecorder.onstop = function() {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TBar_Scenic_Drive_${new Date().getTime()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        isRecording = false;
+        document.getElementById('recBadge').style.display = 'none';
+    };
+    
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById('recBadge').style.display = 'inline-block';
+}
+
+function getDayName(dayIndex) {
+    return ['週日', '週一', '週二', '週三', '週四', '週五', '週六'][dayIndex];
+}
+
+// ☁️ 繪製蓬鬆寫實白雲的獨立函數
+function drawCloudNode(cx, cy, radius) {
+    ctx.save();
+    let grad = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.85)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grad;
+    
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 組合副雲朵，讓雲形更自然
+    ctx.beginPath();
+    ctx.arc(cx - radius*0.5, cy + radius*0.1, radius * 0.7, 0, Math.PI * 2);
+    ctx.arc(cx + radius*0.5, cy + radius*0.1, radius * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+// 🛣️ 繪製包含寫實白雲、立體漸層草地、右側駕駛車道的全新核心場景
+function drawScenicRoad(speed) {
+    roadOffset += speed;
+    if (roadOffset > 160) roadOffset = 0;
+
+    // 1. 蔚藍立體漸層天空
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, HorizonY);
+    skyGrad.addColorStop(0, '#1d91d0'); // 深藍天
+    skyGrad.addColorStop(0.6, '#6ec2e8'); // 晴空藍
+    skyGrad.addColorStop(1, '#bde3f4'); // 地平線泛白
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, HorizonY);
+    
+    // ☁️ 更新並繪製緩慢飄動的白雲
+    clouds.forEach(c => {
+        c.x += c.speed * (speed * 0.4 + 1);
+        if (c.x - c.r * 2 > canvas.width) c.x = -c.r * 2; // 飛出畫面後循環
+        drawCloudNode(c.x, c.y, c.r);
+    });
+
+    // 2. 寫實漸層綠草地 (遠處深綠延伸至近處亮綠，增加立體層次)
+    let grassGrad = ctx.createLinearGradient(0, HorizonY, 0, canvas.height);
+    grassGrad.addColorStop(0, '#13752c'); // 遠景深綠
+    grassGrad.addColorStop(0.3, '#16a34a'); // 中景飽滿綠
+    grassGrad.addColorStop(1, '#22c55e'); // 近景鮮綠
+    ctx.fillStyle = grassGrad; 
+    ctx.fillRect(0, HorizonY, canvas.width, canvas.height - HorizonY);
+
+    // 🌿 繪製公路兩側的動態草地流速線（模擬植被飛逝效果）
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+    ctx.lineWidth = 3;
+    for(let i = 0; i < 6; i++) {
+        let textZ = (i * 400 + roadOffset * 3) % 2400;
+        let s = d / (textZ + d);
+        ctx.beginPath();
+        ctx.arc(VanishingX - 400 * s, HorizonY + (canvas.height - HorizonY)*s, 5 * s, 0, Math.PI*2);
+        ctx.arc(VanishingX + 800 * s, HorizonY + (canvas.height - HorizonY)*s, 8 * s, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(20, 100, 40, 0.2)';
+        ctx.fill();
+    }
+
+    // 3. 幾何設定：模擬駕駛坐在右側車道的視野
+    // 讓柏油路底部的左右跨度大幅往左偏移
+    const roadLeft_bottom = -canvas.width * 0.95;   
+    const roadRight_bottom = canvas.width * 0.35;   
+
+    // 4. 柏油路面主體
+    ctx.fillStyle = '#3f4756'; 
+    ctx.beginPath();
+    ctx.moveTo(VanishingX, HorizonY); 
+    ctx.lineTo(roadRight_bottom + canvas.width/2, canvas.height);
+    ctx.lineTo(roadLeft_bottom + canvas.width/2, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // 5. 兩側邊界大白線
+    ctx.strokeStyle = '#ffffff'; 
+    ctx.lineWidth = Math.max(3, 9 * (canvas.height / 640));
+    ctx.beginPath(); ctx.moveTo(roadLeft_bottom + canvas.width/2, canvas.height); ctx.lineTo(VanishingX, HorizonY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(roadRight_bottom + canvas.width/2, canvas.height); ctx.lineTo(VanishingX, HorizonY); ctx.stroke();
+
+    // 6. 🛠️ 右側駕駛黃色分隔中線：完全精確收束，不與白線錯位
+    ctx.strokeStyle = '#facc15'; 
+    ctx.lineWidth = Math.max(2.5, 7 * (canvas.height / 640));
+    
+    // 計算出左側車道與右側車道之間的精準黃色分界中軸點
+    const midOffsetBottom = (roadLeft_bottom + roadRight_bottom) * 0.4;
+
+    for (let z = 3400; z > 10; z -= 160) {
+        let currentZ = z - roadOffset;
+        if(currentZ <= 0) currentZ += 3400;
+        
+        let scaleStart = d / (currentZ + d);
+        let scaleEnd = d / (currentZ - 90 + d);
+        
+        let xStart = VanishingX + midOffsetBottom * scaleStart;
+        let yStart = HorizonY + (canvas.height - HorizonY) * scaleStart;
+        let xEnd = VanishingX + midOffsetBottom * scaleEnd;
+        let yEnd = HorizonY + (canvas.height - HorizonY) * scaleEnd;
+
+        if (yStart > HorizonY && yEnd > HorizonY) {
+            ctx.beginPath(); ctx.moveTo(xStart, yStart); ctx.lineTo(xEnd, yEnd); ctx.stroke();
+        }
+    }
+}
+
+function animate() {
+    drawScenicRoad(currentSpeed);
+
+    let sortedBars = [...tBarsData].sort((a, b) => b.z3d - a.z3d);
+    const totalQueueLength = tBarsData.length * spacing;
+
+    sortedBars.forEach(bar => {
+        bar.z3d -= currentSpeed;
+
+        if (bar.z3d <= 10) {
+            bar.z3d += Math.max(totalQueueLength, 3400);
+            if (bar.uniqueId === 'text_0' && isRecording) {
+                firstBarLapCounter++;
+                if (firstBarLapCounter >= 1) {
+                    mediaRecorder.stop(); 
+                }
+            }
+        }
+
+        let scale = d / (bar.z3d + d);
+        let screenX = bar.x3d * scale + VanishingX;
+        let screenY = bar.y3d * scale + HorizonY;
+        
+        let w = bar.width * scale;
+        let h = bar.height * scale;
+
+        if (bar.z3d > 15 && screenX < canvas.width + w && screenX > -w) {
+            ctx.save();
+
+            if (bar.z3d > 2400) {
+                ctx.globalAlpha = Math.max(0, 1 - (bar.z3d - 2400) / 1000);
+            }
+
+            // 1. 繪製由細到粗的立體主鋼柱
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = Math.max(1.5, 65 * scale); 
+            ctx.lineCap = 'square';
+            
+            let poleX = screenX + w / 2;
+            let poleTopY = screenY + h;
+            
+            let groundScale = d / (bar.z3d + d);
+            let groundY_proj = (canvas.height - HorizonY) * 0.95 * groundScale + HorizonY;
+            
+            ctx.beginPath(); ctx.moveTo(poleX, poleTopY); ctx.lineTo(poleX, groundY_proj); ctx.stroke();
+
+            // 2. 繪製全域配色看板
+            ctx.fillStyle = bar.bgColor; 
+            ctx.strokeStyle = '#ffffff'; 
+            ctx.lineWidth = Math.max(2, 12 * scale);
+            ctx.fillRect(screenX, screenY, w, h);
+            ctx.strokeRect(screenX, screenY, w, h);
+
+            // 3. 多軌文字引擎
+            let lines = [];
+            ctx.fillStyle = bar.fgColor;
+
+            if (bar.type === 'text') {
+                lines = textNodeInputs[bar.textIndex] ? textNodeInputs[bar.textIndex].split('\n') : [""];
+            } else if (bar.type === 'date') {
+                const now = new Date();
+                lines.push(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`);
+                lines.push(getDayName(now.getDay()));
+            } else if (bar.type === 'time') {
+                const now = new Date();
+                lines.push(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`);
+            }
+
+            // 4. 智慧多行縮放矩陣
+            ctx.translate(screenX + w / 2, screenY + h / 2);
+            ctx.scale(scale, scale); 
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            let fontBaseSize = 170;
+            if (lines.length > 1) fontBaseSize = 120; 
+            if (lines.length > 2) fontBaseSize = 85;
+            
+            ctx.font = `bold ${fontBaseSize}px sans-serif`;
+            const lineHeight = fontBaseSize * 0.92; 
+            const totalHeight = lines.length * lineHeight;
+            let startY = -totalHeight / 2 + lineHeight / 2;
+
+            lines.forEach((line, index) => {
+                ctx.fillText(line, 0, startY + (index * lineHeight), bar.width - 60);
+            });
+
+            ctx.restore();
+        }
+    });
+
+    requestAnimationFrame(animate);
+}
+
+init();
+animate();
+</script>
+</body>
+</html>
