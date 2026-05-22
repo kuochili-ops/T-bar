@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>國道 T-bar 模擬寫實美景版 V24</title>
+    <title>國道 T-bar 模擬寫實美景版 V25</title>
     <style>
         body { margin: 0; background: #b3e0f2; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; height: 100vh; }
         .container { display: flex; flex-direction: column; align-items: center; background: #f1f5f9; padding: 10px; width: 100vw; max-width: 1024px; box-sizing: border-box; height: 100vh; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
@@ -102,8 +102,9 @@ const ctx = canvas.getContext('2d');
 const BASE_WIDTH = 1024;
 const BASE_HEIGHT = 640;
 
-let HorizonY = BASE_HEIGHT * 0.50; 
-let VanishingX = BASE_WIDTH * 0.42; 
+// 🎯 重新校正中心地平線與消失點（向右微調呼應實景圖）
+let HorizonY = BASE_HEIGHT * 0.47; 
+let VanishingX = BASE_WIDTH * 0.46; 
 const d = 260; 
 
 const speedSlider = document.getElementById('speedSlider');
@@ -126,11 +127,11 @@ let isRecording = false;
 let totalPassedBars = 0; 
 
 let clouds = [
-    {x: 100, y: 60, r: 40, speed: 0.1},
-    {x: 250, y: 90, r: 55, speed: 0.15},
-    {x: 550, y: 50, r: 35, speed: 0.08},
-    {x: 800, y: 110, r: 60, speed: 0.12},
-    {x: 950, y: 70, r: 45, speed: 0.09}
+    {x: 80, y: 50, r: 35, speed: 0.08},
+    {x: 280, y: 80, r: 50, speed: 0.12},
+    {x: 520, y: 40, r: 30, speed: 0.06},
+    {x: 760, y: 100, r: 55, speed: 0.1},
+    {x: 920, y: 60, r: 40, speed: 0.07}
 ];
 
 function init() {
@@ -213,11 +214,12 @@ function rebuild3DBars() {
     tBarsData = [];
     let currentZ = 1300;
 
+    // 🎯 修正招牌位置：從偏右改成跨在道路正中央上方 (x3d 調整至更平衡的中心點)
     textNodeInputs.forEach((txt, index) => {
         const uid = `text_${index}`;
         tBarsData.push({
             uniqueId: uid,
-            x3d: 550, y3d: -580,
+            x3d: 150, y3d: -620,
             z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
             width: 780, height: 320,
             type: 'text', textIndex: index,
@@ -229,7 +231,7 @@ function rebuild3DBars() {
     if (addDate) {
         const uid = 'appendix_date';
         tBarsData.push({
-            uniqueId: uid, x3d: 550, y3d: -580,
+            uniqueId: uid, x3d: 150, y3d: -620,
             z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
             width: 780, height: 320, type: 'date', bgColor: bgColor, fgColor: fgColor
         });
@@ -239,7 +241,7 @@ function rebuild3DBars() {
     if (addTime) {
         const uid = 'appendix_time';
         tBarsData.push({
-            uniqueId: uid, x3d: 550, y3d: -580,
+            uniqueId: uid, x3d: 150, y3d: -620,
             z3d: oldZMap[uid] !== undefined ? oldZMap[uid] : currentZ,
             width: 780, height: 320, type: 'time', bgColor: bgColor, fgColor: fgColor
         });
@@ -328,9 +330,9 @@ function drawCloudNode(cx, cy, radius) {
     ctx.restore();
 }
 
-// 🛣️ V24 究極透視核心：白實線、黃虛線全數改為「遠細近粗」動態切段渲染
+// 🛣️ V25 究極透視核心：完美收束對齊，還原真實圖片視角
 function drawScenicRoad(speed) {
-    roadOffset += speed * 4.5; 
+    roadOffset += speed * 5.0; 
     if (roadOffset > 2400) roadOffset = 0;
 
     // 天空
@@ -350,29 +352,18 @@ function drawScenicRoad(speed) {
 
     // 草地
     let grassGrad = ctx.createLinearGradient(0, HorizonY, 0, BASE_HEIGHT);
-    grassGrad.addColorStop(0, '#13752c'); 
-    grassGrad.addColorStop(0.3, '#16a34a'); 
-    grassGrad.addColorStop(1, '#22c55e'); 
+    grassGrad.addColorStop(0, '#1c7a33'); 
+    grassGrad.addColorStop(0.2, '#1e9b41'); 
+    grassGrad.addColorStop(1, '#2ea84f'); 
     ctx.fillStyle = grassGrad; 
     ctx.fillRect(0, HorizonY, BASE_WIDTH, BASE_HEIGHT - HorizonY);
 
-    // 飛逝草浪
-    for(let i = 0; i < 6; i++) {
-        let textZ = (i * 400 + roadOffset * 0.8) % 2400;
-        let s = d / (textZ + d);
-        ctx.beginPath();
-        ctx.arc(VanishingX - 500 * s, HorizonY + (BASE_HEIGHT - HorizonY)*s, 6 * s, 0, Math.PI*2);
-        ctx.arc(VanishingX + 900 * s, HorizonY + (BASE_HEIGHT - HorizonY)*s, 9 * s, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(15, 85, 35, 0.25)';
-        ctx.fill();
-    }
-
-    // 柏油底端基礎邊界
-    const roadLeft_bottom = -BASE_WIDTH * 0.95 + BASE_WIDTH / 2;   
-    const roadRight_bottom = BASE_WIDTH * 0.35 + BASE_WIDTH / 2;   
+    // 🎯 重新設定路面底端寬度（完美呼應 image.png 的寬闊感）
+    const roadLeft_bottom = -BASE_WIDTH * 0.45;   
+    const roadRight_bottom = BASE_WIDTH * 1.35;   
 
     // 繪製柏油路面本體
-    ctx.fillStyle = '#3f4756'; 
+    ctx.fillStyle = '#3a414c'; 
     ctx.beginPath();
     ctx.moveTo(VanishingX, HorizonY); 
     ctx.lineTo(roadRight_bottom, BASE_HEIGHT);
@@ -380,16 +371,16 @@ function drawScenicRoad(speed) {
     ctx.closePath();
     ctx.fill();
 
-    // 中央黃線底端錨點
-    const midOffsetBottom = (-BASE_WIDTH * 0.95 + BASE_WIDTH * 0.35) * 0.4 + BASE_WIDTH / 2;
+    // 🎯 完美收束法：精確分配左、中、右三條線在底部的投影錨點百分比
+    const leftLine_bottom = roadLeft_bottom + (roadRight_bottom - roadLeft_bottom) * 0.05;
+    const midLine_bottom  = roadLeft_bottom + (roadRight_bottom - roadLeft_bottom) * 0.44;
+    const rightLine_bottom = roadLeft_bottom + (roadRight_bottom - roadLeft_bottom) * 0.95;
 
-    // 🛠️ 3D 遠細近粗切段法：同時滿足「連續白實線」與「動態黃虛線」的真實幾何透視
-    let maxSegments = 45; // 提高切段密度使線條更平滑
+    let maxSegments = 50; 
     for (let i = 0; i < maxSegments; i++) {
-        let zStart = (i / maxSegments) * 2400 - (roadOffset * 2);
+        let zStart = (i / maxSegments) * 2400 - (roadOffset * 2.5);
         while (zStart < 0) zStart += 2400;
         
-        // 每一小段緊密相連
         let zEnd = zStart + (2400 / maxSegments); 
 
         let scaleStart = d / (zStart + d);
@@ -398,41 +389,42 @@ function drawScenicRoad(speed) {
         let yStart = HorizonY + (BASE_HEIGHT - HorizonY) * scaleStart;
         let yEnd = HorizonY + (BASE_HEIGHT - HorizonY) * scaleEnd;
 
-        // 核心修正：寬度隨 3D 投影嚴格縮放！遠方只有 1.5 像素，近處腳下放大到 16 像素
-        let wStart = Math.max(1.5, 16 * scaleStart);
-        let wEnd = Math.max(1.5, 16 * scaleEnd);
+        // 遠細近粗：遠方寬度 1.2px，近處腳下依透視放大
+        let wStart = Math.max(1.2, 18 * scaleStart);
+        let wEnd = Math.max(1.2, 18 * scaleEnd);
 
-        // 精準無偏置插值 X 座標
-        let xlS = VanishingX + (roadLeft_bottom - VanishingX) * scaleStart;
-        let xlE = VanishingX + (roadLeft_bottom - VanishingX) * scaleEnd;
+        // 🎯 關鍵修正：所有線段的 3D 插值起點全部綁定同一個 VanishingX 消失點，達成絕對對齊！
+        let xlS = VanishingX + (leftLine_bottom - VanishingX) * scaleStart;
+        let xlE = VanishingX + (leftLine_bottom - VanishingX) * scaleEnd;
 
-        let xrS = VanishingX + (roadRight_bottom - VanishingX) * scaleStart;
-        let xrE = VanishingX + (roadRight_bottom - VanishingX) * scaleEnd;
+        let xcS = VanishingX + (midLine_bottom - VanishingX) * scaleStart;
+        let xcE = VanishingX + (midLine_bottom - VanishingX) * scaleEnd;
 
-        let xcS = VanishingX + (midOffsetBottom - VanishingX) * scaleStart;
-        let xcE = VanishingX + (midOffsetBottom - VanishingX) * scaleEnd;
+        let xrS = VanishingX + (rightLine_bottom - VanishingX) * scaleStart;
+        let xrE = VanishingX + (rightLine_bottom - VanishingX) * scaleEnd;
 
         if (yStart > HorizonY && yEnd < BASE_HEIGHT) {
+            
+            // 1. 左側連續白實線（遠細近粗）
             ctx.fillStyle = '#ffffff';
-
-            // 1. 左側連續白實線（由無數個遠細近粗的梯形無縫拼接而成）
             ctx.beginPath();
             ctx.moveTo(xlS - wStart/2, yStart); ctx.lineTo(xlE - wEnd/2, yEnd);
             ctx.lineTo(xlE + wEnd/2, yEnd); ctx.lineTo(xlS + wStart/2, yStart);
             ctx.fill();
 
-            // 2. 右側連續白實線
+            // 2. 中央黃實線（呼應 image.png 實景改為黃實線，流暢不閃爍）
+            ctx.fillStyle = '#facc15';
             ctx.beginPath();
-            ctx.moveTo(xrS - wStart/2, yStart); ctx.lineTo(xrE - wEnd/2, yEnd);
-            ctx.lineTo(xrE + wEnd/2, yEnd); ctx.lineTo(xrS + wStart/2, yStart);
+            ctx.moveTo(xcS - wStart/2.5, yStart); ctx.lineTo(xcE - wEnd/2.5, yEnd);
+            ctx.lineTo(xcE + wEnd/2.5, yEnd); ctx.lineTo(xcS + wStart/2.5, yStart);
             ctx.fill();
 
-            // 3. 中央黃虛線（依 Z 軸深度規律鏤空，同樣具備遠細近粗效果）
-            if (Math.floor(zStart / 140) % 2 === 0) {
-                ctx.fillStyle = '#facc15';
+            // 3. 右側動態白虛線（配合 Z 軸深度鏤空，達成遠密近疏的高速飛逝感）
+            if (Math.floor(zStart / 130) % 2 === 0) {
+                ctx.fillStyle = '#ffffff';
                 ctx.beginPath();
-                ctx.moveTo(xcS - wStart/2.5, yStart); ctx.lineTo(xcE - wEnd/2.5, yEnd);
-                ctx.lineTo(xcE + wEnd/2.5, yEnd); ctx.lineTo(xcS + wStart/2.5, yStart);
+                ctx.moveTo(xrS - wStart/2, yStart); ctx.lineTo(xrE - wEnd/2, yEnd);
+                ctx.lineTo(xrE + wEnd/2, yEnd); ctx.lineTo(xrS + wStart/2, yStart);
                 ctx.fill();
             }
         }
@@ -473,19 +465,19 @@ function animate() {
                 ctx.globalAlpha = Math.max(0, 1 - (bar.z3d - 2400) / 1000);
             }
 
-            // 立體鋼柱
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = Math.max(1.5, 65 * scale); 
+            // 🎯 立體鋼柱位置調校：向下延伸切齊路面
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = Math.max(2, 50 * scale); 
             ctx.lineCap = 'square';
             
             let poleX = screenX + w / 2;
             let poleTopY = screenY + h;
             let groundScale = d / (bar.z3d + d);
-            let groundY_proj = (BASE_HEIGHT - HorizonY) * 0.95 * groundScale + HorizonY;
+            let groundY_proj = (BASE_HEIGHT - HorizonY) * 0.98 * groundScale + HorizonY;
             
             ctx.beginPath(); ctx.moveTo(poleX, poleTopY); ctx.lineTo(poleX, groundY_proj); ctx.stroke();
 
-            // 看板
+            // 看板門型外框
             ctx.fillStyle = bar.bgColor; 
             ctx.strokeStyle = '#ffffff'; 
             ctx.lineWidth = Math.max(2, 12 * scale);
